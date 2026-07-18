@@ -426,7 +426,20 @@ std::vector<size_t> nsga3::selection(population &R, size_t N_pop) const{
 // Object serialization
 template <typename Archive>
 void nsga3::serialize(Archive &ar, unsigned int) {
-    detail::archive(ar, m_gen, m_cr, m_eta_c, m_mut, m_eta_mut, m_seed, m_verbosity, m_log);
+    detail::archive(
+        ar,
+        m_gen,
+        m_cr,
+        m_eta_c,
+        m_mut,
+        m_eta_mut,
+        m_divisions,
+        m_seed,
+        m_use_memory,
+        m_reng,
+        m_verbosity,
+        m_log
+    );
 }
 
 }  // namespace pagmo
