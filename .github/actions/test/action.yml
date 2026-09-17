@@ -1,0 +1,30 @@
+name: Test
+description: "Builds pagmo2 from source via conda-provisioned toolchain and CMake, then runs the ctest suite. Extracted so this repo's own CI and mono's synced copy of this repo can call the identical steps locally -- see the \"Sharing CI with the monorepo\" pattern already shipped for the infrastructure repo. This is a new Linux x86_64 quality gate, adapted from the existing tools/circleci_ubuntu_arm64.sh build (not currently wired into GitHub Actions at all -- main.yml only runs the macOS/Windows/docs jobs), without that script's ASAN-specific suppressions and fork_island exclusion, since this gate runs a plain Debug build with no sanitizer. Deliberately scoped to the quality gate only, not the docs-deploy pipeline in main.yml, which stays upstream-shaped."
+
+inputs:
+  working-directory:
+    description: Directory containing the pagmo2 CMake project to build and test
+    required: false
+    default: "."
+
+runs:
+  using: composite
+  steps:
+    - name: install conda toolchain and pagmo2 build dependencies
+      shell: bash
+      run: |
+        wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O miniconda.sh
+        bash miniconda.sh -b -p "$HOME/miniconda"
+        echo "$HOME/miniconda/bin" >> "$GITHUB_PATH"
+        export PATH="$HOME/miniconda/bin:$PATH"
+        conda create -y -q -p "$HOME/local" c-compiler cxx-compiler cmake eigen nlopt ipopt boost-cpp tbb tbb-devel
+        echo "PAGMO2_CONDA_PREFIX=$HOME/local" >> "$GITHUB_ENV"
+    - name: build and test
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        source "$HOME/miniconda/bin/activate" "$PAGMO2_CONDA_PREFIX"
+        mkdir -p build && cd build
+        cmake ../ -DCMAKE_PREFIX_PATH="$PAGMO2_CONDA_PREFIX" -DCMAKE_BUILD_TYPE=Debug -DPAGMO_BUILD_TESTS=yes -DPAGMO_WITH_EIGEN3=yes -DPAGMO_WITH_NLOPT=yes -DPAGMO_WITH_IPOPT=yes
+        make -j2 VERBOSE=1
+        ctest -j4 -V
